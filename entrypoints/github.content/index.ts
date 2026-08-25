@@ -1,16 +1,17 @@
-import type { FetchTreeRequest, FetchTreeResponse } from "@/lib/messages";
-import { PANEL_ID, renderPanel } from "@/lib/render";
+import type { FetchTreeRequest, FetchTreeResponse, RebaseRequest, RebaseResponse } from "@/lib/messages";
+import { PANEL_ID, PILL_ID, renderPanel, renderPill } from "@/lib/render";
+import { subtree } from "@/lib/tree";
+import type { Tree } from "@/lib/types";
 
 const PR_RE = /^\/([^/]+\/[^/]+)\/pull\/(\d+)/;
+let seq = 0;
 
 export default defineContentScript({
   matches: ["https://github.com/*"],
   runAt: "document_idle",
   main() {
     void run();
-    // GitHub is a Turbo SPA; re-run on soft navigation.
     document.addEventListener("turbo:load", () => void run());
-    document.addEventListener("turbo:render", () => void run());
   },
 });
 
@@ -19,20 +20,51 @@ async function run() {
   if (!m) return;
   const repo = m[1]!;
   const pr = Number(m[2]!);
-
-  document.getElementById(PANEL_ID)?.remove();
+  const mine = ++seq;
 
   const req: FetchTreeRequest = { type: "fetchTree", repo, pr };
   const res = (await browser.runtime.sendMessage(req)) as FetchTreeResponse;
+  if (mine !== seq) return;
   if (!res.ok) {
     if (res.error !== "no token" && res.error !== "no stacktree label")
       console.warn("[gh-stack-tree]", res.error);
     return;
   }
 
-  const sidebar = document.querySelector(
-    "#partial-discussion-sidebar, [data-testid='issue-viewer-metadata-container']",
+  hideNativeStackBanner();
+
+  const onRebase = (scope: "subtree" | "tree") => rebase(res.tree, res.ids, scope === "subtree" ? pr : null);
+
+  // Header pill next to the Open/Draft state badge, opens a popover with the tree.
+  for (const el of document.querySelectorAll("." + PILL_ID)) el.remove();
+  const badges = document.querySelectorAll(
+    "[data-component='StateLabel'], .gh-header-meta .State",
   );
-  if (!sidebar) return;
-  sidebar.prepend(renderPanel(res.tree, pr, repo, res.label));
+  for (const badge of badges) badge.after(renderPill(res.tree, pr, repo, res.label, onRebase));
+
+  // Full card next to the merge box / CI checks.
+  const mergeBox = document.querySelector(
+    "[data-testid='mergebox-partial'], .merge-pr, .discussion-timeline-actions .merge-message, .discussion-timeline-actions",
+  );
+  document.getElementById(PANEL_ID)?.remove();
+  if (mergeBox) mergeBox.before(renderPanel(res.tree, pr, repo, res.label, onRebase));
+}
+
+async function rebase(tree: Tree, ids: Record<number, string>, root: number | null): Promise<string | null> {
+  const order = subtree(tree, root).filter((n) => !n.merged);
+  const req: RebaseRequest = { type: "rebase", ids: order.map((n) => ids[n.pr]!) };
+  const res = (await browser.runtime.sendMessage(req)) as RebaseResponse;
+  if (!res.ok) return res.failedAt ? `#${res.failedAt}: ${res.error}` : res.error;
+  location.reload();
+  return null;
+}
+
+/** GitHub's "This pull request can be stacked… Preview stack" suggestion banner. */
+function hideNativeStackBanner() {
+  const btn = [...document.querySelectorAll<HTMLElement>("a, button")].find(
+    (b) => /^\s*Preview stack\s*$/.test(b.textContent ?? ""),
+  );
+  const banner = btn?.closest<HTMLElement>("[class*='Banner'], [role='alert'], .flash, [data-testid*='banner']")
+    ?? btn?.parentElement?.parentElement ?? null;
+  if (banner) banner.style.display = "none";
 }

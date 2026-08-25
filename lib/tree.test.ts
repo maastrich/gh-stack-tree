@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { inferTree, stackLabel } from "./infer";
-import { flatten, pathTo, prefix } from "./tree";
+import { flatten, pathTo, prefix, subtree } from "./tree";
 
 const tree = {
   trunk: "main",
@@ -47,5 +47,12 @@ describe("stackLabel", () => {
   it("finds prefixed label", () => {
     expect(stackLabel(["bug", "stacktree:lcm"])).toBe("stacktree:lcm");
     expect(stackLabel(["bug"])).toBeNull();
+  });
+});
+
+describe("subtree", () => {
+  it("dfs from node, parents first", () => {
+    expect(subtree(tree, 3).map((n) => n.pr)).toEqual([3, 4]);
+    expect(subtree(tree, null).map((n) => n.pr)).toEqual([1, 2, 3, 4]);
   });
 });

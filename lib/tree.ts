@@ -45,3 +45,17 @@ export function pathTo(tree: Tree, pr: number): TreeNode[] {
   }
   return out;
 }
+
+/** DFS preorder of the subtree rooted at `pr` (inclusive). Parents before children. */
+export function subtree(tree: Tree, pr: number | null): TreeNode[] {
+  const byParent = new Map<number | null, TreeNode[]>();
+  for (const n of tree.nodes) byParent.set(n.parent, [...(byParent.get(n.parent) ?? []), n]);
+  const out: TreeNode[] = [];
+  const byPr = new Map(tree.nodes.map((n) => [n.pr, n]));
+  const walk = (p: number | null) => {
+    for (const k of byParent.get(p) ?? []) { out.push(k); walk(k.pr); }
+  };
+  if (pr !== null) { const root = byPr.get(pr); if (root) out.push(root); }
+  walk(pr);
+  return out;
+}

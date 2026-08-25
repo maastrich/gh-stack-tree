@@ -1,14 +1,20 @@
-import type { Tree, TreeNode } from "./types";
+import type { CIState, ReviewDecision, Tree, TreeNode } from "./types";
 
 export const LABEL_PREFIX = "stacktree:";
 
 export interface PRInfo {
   number: number;
+  id?: string;
   head: string;
   base: string;
   title?: string;
   merged?: boolean;
   draft?: boolean;
+  additions?: number;
+  deletions?: number;
+  ci?: CIState;
+  review?: ReviewDecision;
+  behind?: boolean;
 }
 
 export function stackLabel(labels: string[]): string | null {
@@ -34,6 +40,11 @@ export function inferTree(prs: PRInfo[]): Tree {
       title: p.title,
       merged: p.merged,
       draft: p.draft,
+      additions: p.additions,
+      deletions: p.deletions,
+      ci: p.ci,
+      review: p.review,
+      behind: p.behind,
     });
   }
   let trunk = "";
