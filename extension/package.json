@@ -2,7 +2,7 @@
   "name": "gh-stack-tree",
   "description": "Render tree-shaped PR stacks on github.com",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
