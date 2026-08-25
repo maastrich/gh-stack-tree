@@ -1,5 +1,5 @@
 import type { Tree, TreeNode } from "./types";
-import { flatten, pathTo } from "./tree";
+import { flatten, pathTo, subtree } from "./tree";
 
 function cell(cls: string): HTMLElement {
   const i = document.createElement("i");
@@ -44,6 +44,7 @@ const css = `
 .gst-btn:disabled{opacity:.6;cursor:default}
 .${PILL_ID}{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:0 10px;height:28px;border-radius:2em;border:1px solid var(--borderColor-default);color:var(--fgColor-default);font-size:14px;font-weight:500;cursor:pointer;background:transparent;vertical-align:middle;position:relative}
 .${PILL_ID}:hover{background:var(--bgColor-muted)}
+.gst-mono{font-variant-numeric:tabular-nums}
 .gst-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:100;width:min(520px,90vw);box-shadow:var(--shadow-floating-large,0 8px 24px rgba(0,0,0,.4));text-align:left;font-weight:400;cursor:default}
 `;
 
@@ -76,12 +77,13 @@ function ci(n: TreeNode): { color: string; title: string } | null {
 
 export function renderPill(tree: Tree, currentPr: number, repo: string, label: string | undefined, onRebase: RebaseFn): HTMLElement {
   ensureStyle();
-  const pos = pathTo(tree, currentPr).length;
+  const below = pathTo(tree, currentPr).length - 1; // ancestors (toward trunk)
+  const above = subtree(tree, currentPr).length - 1; // descendants
   const pill = document.createElement("button");
   pill.className = PILL_ID;
   pill.type = "button";
-  pill.innerHTML = `${ICON}<span>${pos}/${tree.nodes.length}</span>`;
-  pill.title = "Stack tree";
+  pill.innerHTML = `${ICON}<span class="gst-mono">↓${below} ↑${above}</span>`;
+  pill.title = `Stack tree: ${below} PR${below === 1 ? "" : "s"} below (must merge first), ${above} PR${above === 1 ? "" : "s"} above (depend on this one)`;
   let pop: HTMLElement | null = null;
   const close = () => { pop?.remove(); pop = null; document.removeEventListener("click", onDoc, true); };
   const onDoc = (e: Event) => { if (pop && !pill.contains(e.target as Node)) close(); };
