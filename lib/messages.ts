@@ -9,4 +9,6 @@ export type FetchTreeResponse =
 export interface RebaseRequest { type: "rebase"; ids: string[] }
 export type RebaseResponse = { ok: true } | { ok: false; error: string; failedAt?: string };
 
-export type Request = FetchTreeRequest | RebaseRequest;
+export interface FetchTreeByLabelRequest { type: "fetchTreeByLabel"; repo: string; label: string }
+
+export type Request = FetchTreeRequest | RebaseRequest | FetchTreeByLabelRequest;

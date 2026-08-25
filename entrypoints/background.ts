@@ -9,6 +9,7 @@ export default defineBackground(() => {
       const p =
         msg?.type === "fetchTree" ? fetchTree(msg.repo, msg.pr)
         : msg?.type === "rebase" ? rebase(msg.ids)
+        : msg?.type === "fetchTreeByLabel" ? fetchTreeByLabel(msg.repo, msg.label)
         : null;
       if (!p) return;
       p.then(sendResponse).catch((e) => sendResponse({ ok: false, error: String(e) }));
@@ -48,6 +49,13 @@ async function fetchTree(repo: string, pr: number): Promise<FetchTreeResponse> {
   const labels = labelsData.repository.pullRequest?.labels.nodes.map((l) => l.name) ?? [];
   const label = stackLabel(labels);
   if (!label) return { ok: false, error: "no stacktree label" };
+  return fetchTreeByLabel(repo, label);
+}
+
+async function fetchTreeByLabel(repo: string, label: string): Promise<FetchTreeResponse> {
+  const token = await tokenItem.getValue();
+  if (!token) return { ok: false, error: "no token" };
+  const [owner, name] = repo.split("/") as [string, string];
 
   const prsData = await gql<{ repository: { pullRequests: { nodes: {
     id: string; number: number; title: string; headRefName: string; baseRefName: string; merged: boolean; isDraft: boolean;
