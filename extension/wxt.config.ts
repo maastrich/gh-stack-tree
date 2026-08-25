@@ -6,5 +6,8 @@ export default defineConfig({
     description: "Render tree-shaped PR stacks on github.com",
     permissions: ["storage"],
     host_permissions: ["https://github.com/*", "https://api.github.com/*"],
+    browser_specific_settings: {
+      gecko: { id: "gh-stack-tree@maastrich.dev", strict_min_version: "115.0" },
+    },
   },
 });
