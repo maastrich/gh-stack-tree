@@ -1,0 +1,63 @@
+# Continuous delivery.
+#
+# 1. release-please watches main, keeps a "chore: release" PR up to date from
+#    Conventional Commits, and on merge creates the GitHub release + tag.
+# 2. On that release, the gh extension binaries are built and attached
+#    (gh extension install maastrich/gh-stack-tree), and the browser extension
+#    zips (chrome + firefox) are attached too.
+#
+# The skill needs no build: `npx skills add maastrich/gh-stack-tree` reads
+# skills/*/SKILL.md straight from the default branch.
+name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          release-type: simple
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  gh-extension:
+    needs: release-please
+    if: needs.release-please.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: cli/go.mod }
+      - uses: cli/gh-extension-precompile@v2
+        with:
+          go_version_file: cli/go.mod
+          build_script_override: scripts/build-gh-extension.sh
+          release_tag: ${{ needs.release-please.outputs.tag }}
+
+  browser-extension:
+    needs: release-please
+    if: needs.release-please.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: extension } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm, cache-dependency-path: extension/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm zip && pnpm zip:firefox
+      - name: Attach zips to the release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release upload "${{ needs.release-please.outputs.tag }}" .output/*.zip --clobber
+      # Store publishing (Chrome Web Store / AMO) plugs in here with `wxt submit`
+      # once the store credentials exist as repository secrets.
