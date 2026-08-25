@@ -5,8 +5,14 @@
   "packages": {
     ".": {
       "extra-files": [
-        { "type": "json", "path": "extension/package.json", "jsonpath": "$.version" }
+        {
+          "type": "json",
+          "path": "extension/package.json",
+          "jsonpath": "$.version"
+        }
       ]
     }
-  }
+  },
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false
 }
