@@ -6,15 +6,14 @@ GitHub's native stacked PRs are linear. This extension reads a tree description
 the CLI embeds in PR bodies and draws it in the PR sidebar, highlighting the
 path from trunk to the current PR.
 
-## Body format
+## How it works
 
-Fenced code block (HTML comments are stripped by GitHub):
+Label every PR of a stack with `stacktree:<name>`. On a PR page the extension
+finds that label, lists all PRs carrying it (GraphQL), and builds the tree from
+each PR's base branch. Nothing is stored in PR bodies.
 
-```
-```gh-stack-tree
-{"trunk":"main","nodes":[{"pr":12,"branch":"feat/a","parent":null},{"pr":13,"branch":"feat/b","parent":12}]}
-```
-```
+Needs a GitHub token in the extension options (fine-grained PAT,
+`Pull requests: read` on the repos you use).
 
 ## Dev
 

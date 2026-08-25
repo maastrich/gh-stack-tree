@@ -3,7 +3,7 @@ import { flatten, pathTo, prefix } from "./tree";
 
 export const PANEL_ID = "gh-stack-tree-panel";
 
-export function renderPanel(tree: Tree, currentPr: number, repo: string): HTMLElement {
+export function renderPanel(tree: Tree, currentPr: number, repo: string, label?: string): HTMLElement {
   const onPath = new Set(pathTo(tree, currentPr).map((n) => n.pr));
   const panel = document.createElement("div");
   panel.id = PANEL_ID;
@@ -11,7 +11,7 @@ export function renderPanel(tree: Tree, currentPr: number, repo: string): HTMLEl
 
   const heading = document.createElement("div");
   heading.className = "text-bold";
-  heading.textContent = "Stack tree";
+  heading.textContent = label ? `Stack tree · ${label.replace(/^stacktree:/, "")}` : "Stack tree";
   panel.append(heading);
 
   const pre = document.createElement("pre");
@@ -35,10 +35,12 @@ export function renderPanel(tree: Tree, currentPr: number, repo: string): HTMLEl
     const a = document.createElement("a");
     a.href = `/${repo}/pull/${node.pr}`;
     a.textContent = `#${node.pr} ${node.branch}`;
+    if (node.title) a.title = node.title;
     a.style.color = node.merged ? "var(--fgColor-done)" : "var(--fgColor-accent)";
 
     line.append(guide, a);
     if (node.merged) line.append(document.createTextNode(" ✓"));
+    else if (node.draft) line.append(document.createTextNode(" (draft)"));
     if (isCurrent) line.append(document.createTextNode(" ◀"));
     pre.append(line);
   }

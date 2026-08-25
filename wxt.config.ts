@@ -5,6 +5,6 @@ export default defineConfig({
     name: "gh-stack-tree",
     description: "Render tree-shaped PR stacks on github.com",
     permissions: ["storage"],
-    host_permissions: ["https://github.com/*"],
+    host_permissions: ["https://github.com/*", "https://api.github.com/*"],
   },
 });

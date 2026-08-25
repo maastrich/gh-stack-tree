@@ -1,4 +1,4 @@
-import { findTreeBlock, parseTreeFromDOM } from "@/lib/markers";
+import type { FetchTreeRequest, FetchTreeResponse } from "@/lib/messages";
 import { PANEL_ID, renderPanel } from "@/lib/render";
 
 const PR_RE = /^\/([^/]+\/[^/]+)\/pull\/(\d+)/;
@@ -7,14 +7,14 @@ export default defineContentScript({
   matches: ["https://github.com/*"],
   runAt: "document_idle",
   main() {
-    run();
+    void run();
     // GitHub is a Turbo SPA; re-run on soft navigation.
-    document.addEventListener("turbo:load", run);
-    document.addEventListener("turbo:render", run);
+    document.addEventListener("turbo:load", () => void run());
+    document.addEventListener("turbo:render", () => void run());
   },
 });
 
-function run() {
+async function run() {
   const m = location.pathname.match(PR_RE);
   if (!m) return;
   const repo = m[1]!;
@@ -22,21 +22,17 @@ function run() {
 
   document.getElementById(PANEL_ID)?.remove();
 
-  const bodyEl = document.querySelector<HTMLElement>(
-    ".js-comment-body, [data-testid='issue-body'] .markdown-body",
-  );
-  if (!bodyEl) return;
-  const tree = parseTreeFromDOM(bodyEl);
-  if (!tree) return;
-
-  // Hide the raw block; the panel replaces it.
-  const block = findTreeBlock(bodyEl);
-  const wrapper = block?.closest<HTMLElement>("div.highlight, pre") ?? block;
-  if (wrapper) wrapper.style.display = "none";
+  const req: FetchTreeRequest = { type: "fetchTree", repo, pr };
+  const res = (await browser.runtime.sendMessage(req)) as FetchTreeResponse;
+  if (!res.ok) {
+    if (res.error !== "no token" && res.error !== "no stacktree label")
+      console.warn("[gh-stack-tree]", res.error);
+    return;
+  }
 
   const sidebar = document.querySelector(
     "#partial-discussion-sidebar, [data-testid='issue-viewer-metadata-container']",
   );
   if (!sidebar) return;
-  sidebar.prepend(renderPanel(tree, pr, repo));
+  sidebar.prepend(renderPanel(res.tree, pr, repo, res.label));
 }

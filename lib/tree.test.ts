@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTree, serializeTree } from "./markers";
+import { inferTree, stackLabel } from "./infer";
 import { flatten, pathTo, prefix } from "./tree";
 
 const tree = {
@@ -14,8 +14,7 @@ const tree = {
 
 describe("flatten", () => {
   it("dfs order with guides", () => {
-    const rows = flatten(tree);
-    expect(rows.map((r) => prefix(r) + r.node.branch)).toEqual([
+    expect(flatten(tree).map((r) => prefix(r) + r.node.branch)).toEqual([
       "└─ a",
       "   ├─ b",
       "   └─ c",
@@ -30,12 +29,23 @@ describe("pathTo", () => {
   });
 });
 
-describe("markers", () => {
-  it("round-trips fenced block", () => {
-    const body = `hello\n\n${serializeTree(tree)}\n\nbye`;
-    expect(parseTree(body)).toEqual(tree);
+describe("inferTree", () => {
+  it("builds parents from base<-head and picks trunk", () => {
+    const t = inferTree([
+      { number: 4, head: "d", base: "c" },
+      { number: 1, head: "a", base: "main" },
+      { number: 3, head: "c", base: "a" },
+      { number: 2, head: "b", base: "a" },
+      { number: 5, head: "e", base: "main" },
+    ]);
+    expect(t.trunk).toBe("main");
+    expect(t.nodes.map((n) => [n.pr, n.parent])).toEqual([[1, null], [2, 1], [3, 1], [4, 3], [5, null]]);
   });
-  it("null when absent", () => {
-    expect(parseTree("nothing")).toBeNull();
+});
+
+describe("stackLabel", () => {
+  it("finds prefixed label", () => {
+    expect(stackLabel(["bug", "stacktree:lcm"])).toBe("stacktree:lcm");
+    expect(stackLabel(["bug"])).toBeNull();
   });
 });
