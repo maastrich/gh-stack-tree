@@ -36,8 +36,44 @@ jobs:
           path: extension/.output/*.zip
           include-hidden-files: true
           if-no-files-found: error
-      # Store publishing (Chrome Web Store / AMO) plugs in here with `wxt submit`
-      # once the store credentials exist as repository secrets.
+
+  stores:
+    name: Publish to stores
+    needs: browser-extension
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: extension } }
+    # Each store is gated on its own secrets; nothing is submitted until they
+    # exist. Create them with `pnpm wxt submit init` (see CONTRIBUTING.md).
+    env:
+      CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+      FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+      FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+      EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+      EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+      EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with: { name: browser-extension, path: extension/.output }
+      - name: Chrome Web Store
+        if: env.CHROME_EXTENSION_ID != ''
+        run: pnpm wxt submit --chrome-zip .output/*-chrome.zip
+      - name: Firefox Add-ons
+        if: env.FIREFOX_EXTENSION_ID != ''
+        run: pnpm wxt submit --firefox-zip .output/*-firefox.zip --firefox-sources-zip .output/*-sources.zip
+      - name: Edge Add-ons
+        if: env.EDGE_PRODUCT_ID != ''
+        run: pnpm wxt submit --edge-zip .output/*-chrome.zip
+      - if: env.CHROME_EXTENSION_ID == '' && env.FIREFOX_EXTENSION_ID == '' && env.EDGE_PRODUCT_ID == ''
+        run: echo "no store credentials configured — skipped"
 
   release:
     name: GitHub Release
