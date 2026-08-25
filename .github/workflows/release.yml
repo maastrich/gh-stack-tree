@@ -31,7 +31,11 @@ jobs:
       - run: pnpm test
       - run: pnpm zip && pnpm zip:firefox
       - uses: actions/upload-artifact@v4
-        with: { name: browser-extension, path: extension/.output/*.zip }
+        with:
+          name: browser-extension
+          path: extension/.output/*.zip
+          include-hidden-files: true
+          if-no-files-found: error
       # Store publishing (Chrome Web Store / AMO) plugs in here with `wxt submit`
       # once the store credentials exist as repository secrets.
 
