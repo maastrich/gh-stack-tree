@@ -8,10 +8,12 @@ path from trunk to the current PR.
 
 ## Body format
 
+Fenced code block (HTML comments are stripped by GitHub):
+
 ```
-<!-- gh-stack-tree:start
+```gh-stack-tree
 {"trunk":"main","nodes":[{"pr":12,"branch":"feat/a","parent":null},{"pr":13,"branch":"feat/b","parent":12}]}
-gh-stack-tree:end -->
+```
 ```
 
 ## Dev

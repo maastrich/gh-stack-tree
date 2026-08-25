@@ -1,23 +1,39 @@
 import type { Tree } from "./types";
 
-export const START = "<!-- gh-stack-tree:start";
-export const END = "gh-stack-tree:end -->";
+export const LANG = "gh-stack-tree";
 
 /**
- * Extract the tree JSON embedded in a PR body.
- * Format:
- *   <!-- gh-stack-tree:start
+ * Parse tree JSON from raw markdown containing a fenced block:
+ *   ```gh-stack-tree
  *   {"trunk":"main","nodes":[...]}
- *   gh-stack-tree:end -->
+ *   ```
  */
-export function parseTree(body: string): Tree | null {
-  const s = body.indexOf(START);
-  if (s === -1) return null;
-  const e = body.indexOf(END, s);
-  if (e === -1) return null;
-  const raw = body.slice(s + START.length, e).trim();
+export function parseTree(markdown: string): Tree | null {
+  const re = new RegExp("```" + LANG + "\\s*\\n([\\s\\S]*?)\\n```");
+  const m = markdown.match(re);
+  return m ? parseJSON(m[1]!) : null;
+}
+
+/** Find the rendered fenced block inside a GitHub markdown body element. */
+export function findTreeBlock(root: ParentNode): HTMLElement | null {
+  return root.querySelector<HTMLElement>(
+    `pre > code.language-${LANG}, pre[lang="${LANG}"] > code, div.highlight-source-${LANG} pre`,
+  );
+}
+
+/** Parse tree from a rendered GitHub body element. */
+export function parseTreeFromDOM(root: ParentNode): Tree | null {
+  const code = findTreeBlock(root);
+  return code ? parseJSON(code.textContent ?? "") : null;
+}
+
+export function serializeTree(tree: Tree): string {
+  return "```" + LANG + "\n" + JSON.stringify(tree) + "\n```";
+}
+
+function parseJSON(raw: string): Tree | null {
   try {
-    const t = JSON.parse(raw) as Tree;
+    const t = JSON.parse(raw.trim()) as Tree;
     if (!t || !Array.isArray(t.nodes) || typeof t.trunk !== "string") return null;
     return t;
   } catch {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTree } from "./markers";
+import { parseTree, serializeTree } from "./markers";
 import { flatten, pathTo, prefix } from "./tree";
 
 const tree = {
@@ -30,9 +30,9 @@ describe("pathTo", () => {
   });
 });
 
-describe("parseTree", () => {
-  it("extracts json between markers", () => {
-    const body = `hello\n<!-- gh-stack-tree:start\n${JSON.stringify(tree)}\ngh-stack-tree:end -->\nbye`;
+describe("markers", () => {
+  it("round-trips fenced block", () => {
+    const body = `hello\n\n${serializeTree(tree)}\n\nbye`;
     expect(parseTree(body)).toEqual(tree);
   });
   it("null when absent", () => {
