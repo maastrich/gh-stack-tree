@@ -2,6 +2,11 @@
 
 # gh-stack-tree
 
+[![CI](https://github.com/maastrich/gh-stack-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/maastrich/gh-stack-tree/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Built with WXT](https://img.shields.io/badge/built%20with-WXT-67d55f)](https://wxt.dev)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Browser extension (Chrome/Firefox, [WXT](https://wxt.dev)) that renders tree-shaped PR stacks on github.com.
 
 GitHub's native stacked PRs are linear. This extension reads a tree description
@@ -47,3 +52,25 @@ pnpm dev          # chrome
 pnpm dev:firefox
 pnpm test
 ```
+
+## Install
+
+Not on the stores yet. Build and load unpacked:
+
+```sh
+pnpm install && pnpm build          # → .output/chrome-mv3
+pnpm build:firefox                  # → .output/firefox-mv2
+```
+
+Chrome / Arc / Edge: `chrome://extensions` → Developer mode → Load unpacked → `.output/chrome-mv3`.
+Firefox: `about:debugging` → This Firefox → Load Temporary Add-on → `.output/firefox-mv2/manifest.json`.
+
+Then open the extension options and paste a GitHub token.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © Mathis Pinsault

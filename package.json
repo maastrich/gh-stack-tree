@@ -21,5 +21,22 @@
     "vitest": "^3.2.4",
     "web-ext": "^10.5.0",
     "wxt": "^0.21.3"
-  }
+  },
+  "license": "MIT",
+  "author": "Mathis Pinsault",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maastrich/gh-stack-tree.git"
+  },
+  "homepage": "https://github.com/maastrich/gh-stack-tree#readme",
+  "bugs": {
+    "url": "https://github.com/maastrich/gh-stack-tree/issues"
+  },
+  "keywords": [
+    "github",
+    "pull-requests",
+    "stacked-prs",
+    "browser-extension",
+    "wxt"
+  ]
 }
