@@ -1,15 +1,18 @@
 import { inferTree, stackLabel, type PRInfo } from "@/lib/infer";
-import type { FetchTreeResponse, RebaseResponse, Request } from "@/lib/messages";
+import type { FetchTreeResponse, RebaseResponse, Request, SimpleResponse, StackOptionsResponse } from "@/lib/messages";
 import { tokenItem } from "@/lib/storage";
 import type { CIState, ReviewDecision } from "@/lib/types";
 
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener(
-    (msg: Request, _sender, sendResponse: (r: FetchTreeResponse | RebaseResponse) => void) => {
+    (msg: Request, _sender, sendResponse: (r: FetchTreeResponse | RebaseResponse | StackOptionsResponse | SimpleResponse) => void) => {
       const p =
         msg?.type === "fetchTree" ? fetchTree(msg.repo, msg.pr)
         : msg?.type === "rebase" ? rebase(msg.ids)
         : msg?.type === "fetchTreeByLabel" ? fetchTreeByLabel(msg.repo, msg.label)
+        : msg?.type === "stackOptions" ? stackOptions(msg.repo, msg.pr)
+        : msg?.type === "setStackLabel" ? setStackLabel(msg.repo, msg.prId, msg.label)
+        : msg?.type === "removeStackLabel" ? removeStackLabel(msg.repo, msg.prId, msg.label)
         : null;
       if (!p) return;
       p.then(sendResponse).catch((e) => sendResponse({ ok: false, error: String(e) }));
@@ -101,5 +104,65 @@ async function rebase(ids: string[]): Promise<RebaseResponse> {
       if (now.node.headRefOid !== before.node.headRefOid) break;
     }
   }
+  return { ok: true };
+}
+
+const OPTIONS_Q = `query($owner:String!,$name:String!,$number:Int!){
+  repository(owner:$owner,name:$name){
+    id
+    labels(first:50,query:"stacktree:"){ nodes{ name } }
+    pullRequest(number:$number){ id baseRefName
+      labels(first:50){ nodes{ name } } } } }`;
+const PARENT_Q = `query($owner:String!,$name:String!,$head:String!){
+  repository(owner:$owner,name:$name){
+    pullRequests(headRefName:$head,states:[OPEN,MERGED],first:1,orderBy:{field:CREATED_AT,direction:DESC}){
+      nodes{ labels(first:50){ nodes{ name } } } } } }`;
+const LABEL_ID_Q = `query($owner:String!,$name:String!,$label:String!){
+  repository(owner:$owner,name:$name){ id label(name:$label){ id } } }`;
+const CREATE_LABEL_M = `mutation($repo:ID!,$name:String!,$color:String!,$desc:String){
+  createLabel(input:{repositoryId:$repo,name:$name,color:$color,description:$desc}){ label{ id } } }`;
+const ADD_LABEL_M = `mutation($id:ID!,$labels:[ID!]!){ addLabelsToLabelable(input:{labelableId:$id,labelIds:$labels}){ clientMutationId } }`;
+const REMOVE_LABEL_M = `mutation($id:ID!,$labels:[ID!]!){ removeLabelsFromLabelable(input:{labelableId:$id,labelIds:$labels}){ clientMutationId } }`;
+
+async function stackOptions(repo: string, pr: number): Promise<StackOptionsResponse> {
+  const token = await tokenItem.getValue();
+  if (!token) return { ok: false, error: "no token" };
+  const [owner, name] = repo.split("/") as [string, string];
+  const d = await gql<{ repository: { labels: { nodes: { name: string }[] };
+    pullRequest: { id: string; baseRefName: string; labels: { nodes: { name: string }[] } } | null } }>(
+    token, OPTIONS_Q, { owner, name, number: pr });
+  if (!d.repository.pullRequest) return { ok: false, error: "PR not found" };
+  const base = d.repository.pullRequest.baseRefName;
+  const labels = d.repository.labels.nodes.map((l) => l.name).filter((l) => l.startsWith("stacktree:"));
+  const pd = await gql<{ repository: { pullRequests: { nodes: { labels: { nodes: { name: string }[] } }[] } } }>(
+    token, PARENT_Q, { owner, name, head: base });
+  const parentLabel = stackLabel(pd.repository.pullRequests.nodes[0]?.labels.nodes.map((l) => l.name) ?? []);
+  return { ok: true, prId: d.repository.pullRequest.id, base, parentLabel, labels };
+}
+
+async function labelId(token: string, repo: string, label: string, create: boolean): Promise<string> {
+  const [owner, name] = repo.split("/") as [string, string];
+  const d = await gql<{ repository: { id: string; label: { id: string } | null } }>(token, LABEL_ID_Q, { owner, name, label });
+  if (d.repository.label) return d.repository.label.id;
+  if (!create) throw new Error(`label ${label} not found`);
+  const c = await gql<{ createLabel: { label: { id: string } } }>(token, CREATE_LABEL_M, {
+    repo: d.repository.id, name: label, color: "0E8A16", desc: `PR stack tree: ${label.slice("stacktree:".length)}`,
+  });
+  return c.createLabel.label.id;
+}
+
+async function setStackLabel(repo: string, prId: string, label: string): Promise<SimpleResponse> {
+  const token = await tokenItem.getValue();
+  if (!token) return { ok: false, error: "no token" };
+  const id = await labelId(token, repo, label, true);
+  await gql(token, ADD_LABEL_M, { id: prId, labels: [id] });
+  return { ok: true };
+}
+
+async function removeStackLabel(repo: string, prId: string, label: string): Promise<SimpleResponse> {
+  const token = await tokenItem.getValue();
+  if (!token) return { ok: false, error: "no token" };
+  const id = await labelId(token, repo, label, false);
+  await gql(token, REMOVE_LABEL_M, { id: prId, labels: [id] });
   return { ok: true };
 }

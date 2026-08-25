@@ -1,5 +1,5 @@
-import type { FetchTreeRequest, FetchTreeResponse, RebaseRequest, RebaseResponse } from "@/lib/messages";
-import { PANEL_ID, PILL_ID, renderPanel, renderPill } from "@/lib/render";
+import type { FetchTreeRequest, FetchTreeResponse, RebaseRequest, RebaseResponse, RemoveStackLabelRequest, SetStackLabelRequest, SimpleResponse, StackOptionsRequest, StackOptionsResponse } from "@/lib/messages";
+import { PANEL_ID, PILL_ID, renderJoinPill, renderPanel, renderPill } from "@/lib/render";
 import { subtree } from "@/lib/tree";
 import type { Tree } from "@/lib/types";
 
@@ -26,12 +26,22 @@ async function run() {
   const res = (await browser.runtime.sendMessage(req)) as FetchTreeResponse;
   if (mine !== seq) return;
   if (!res.ok) {
-    if (res.error !== "no token" && res.error !== "no stacktree label")
-      console.warn("[gh-stack-tree]", res.error);
+    if (res.error === "no stacktree label") await offerJoin(repo, pr);
+    else if (res.error !== "no token") console.warn("[gh-stack-tree]", res.error);
     return;
   }
 
   hideNativeStackBanner();
+
+  const onLeave = async (): Promise<string | null> => {
+    const prId = res.ids[pr];
+    if (!prId) return "PR id unknown";
+    const req: RemoveStackLabelRequest = { type: "removeStackLabel", repo, prId, label: res.label };
+    const r = (await browser.runtime.sendMessage(req)) as SimpleResponse;
+    if (!r.ok) return r.error;
+    location.reload();
+    return null;
+  };
 
   const onRebase = (scope: "subtree" | "tree") => rebase(res.tree, res.ids, scope === "subtree" ? pr : null);
 
@@ -47,7 +57,24 @@ async function run() {
     "[data-testid='mergebox-partial'], .merge-pr, .discussion-timeline-actions .merge-message, .discussion-timeline-actions",
   );
   document.getElementById(PANEL_ID)?.remove();
-  if (mergeBox) mergeBox.before(renderPanel(res.tree, pr, repo, res.label, onRebase));
+  if (mergeBox) mergeBox.before(renderPanel(res.tree, pr, repo, res.label, onRebase, { onLeave }));
+}
+
+async function offerJoin(repo: string, pr: number) {
+  const req: StackOptionsRequest = { type: "stackOptions", repo, pr };
+  const o = (await browser.runtime.sendMessage(req)) as StackOptionsResponse;
+  if (!o.ok) { console.warn("[gh-stack-tree]", o.error); return; }
+  const onJoin = async (label: string): Promise<string | null> => {
+    const r = (await browser.runtime.sendMessage(
+      { type: "setStackLabel", repo, prId: o.prId, label } satisfies SetStackLabelRequest,
+    )) as SimpleResponse;
+    if (!r.ok) return r.error;
+    location.reload();
+    return null;
+  };
+  for (const el of document.querySelectorAll("." + PILL_ID)) el.remove();
+  for (const badge of document.querySelectorAll("[data-component='StateLabel'], .gh-header-meta .State"))
+    badge.after(renderJoinPill({ base: o.base, parentLabel: o.parentLabel, labels: o.labels, onJoin }));
 }
 
 async function rebase(tree: Tree, ids: Record<number, string>, root: number | null): Promise<string | null> {
