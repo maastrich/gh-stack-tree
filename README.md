@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" width="96" alt="gh-stack-tree"></p>
+
 # gh-stack-tree
 
 Browser extension (Chrome/Firefox, [WXT](https://wxt.dev)) that renders tree-shaped PR stacks on github.com.
