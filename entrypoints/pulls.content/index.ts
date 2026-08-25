@@ -16,10 +16,15 @@ export default defineContentScript({
 });
 
 const css = `
-.${CLS}-hd{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bgColor-muted);border-top:1px solid var(--borderColor-default);border-bottom:1px solid var(--borderColor-muted);font-size:12px;font-weight:600}
-.${CLS}-hd .n{color:var(--fgColor-muted);font-weight:400;margin-left:auto}
-.${CLS}-row{position:relative}
-.${CLS}-g{position:absolute;left:0;top:0;bottom:0;display:flex;pointer-events:none}
+.${CLS}-wrap{margin:8px 16px;border:1px solid var(--borderColor-default);border-radius:6px;overflow:hidden}
+.${CLS}-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bgColor-muted);border-bottom:1px solid var(--borderColor-muted);font-weight:600;font-size:13px}
+.${CLS}-hd .n{color:var(--fgColor-muted);font-weight:400}
+.${CLS}-hd .n.r{margin-left:auto}
+.${CLS}-trunk{padding:6px 12px;color:var(--fgColor-muted);font-family:ui-monospace,monospace;font-size:12px;border-bottom:1px solid var(--borderColor-muted)}
+.${CLS}-flex{display:flex;align-items:stretch}
+.${CLS}-flex > .${CLS}-g{align-self:stretch}
+.${CLS}-row:last-child{border-bottom:0!important}
+.${CLS}-g{display:flex;margin-right:4px}
 .${CLS}-g i{display:block;width:16px;position:relative}
 .${CLS}-g i.v::before{content:"";position:absolute;left:7px;top:0;bottom:0;border-left:2px solid var(--borderColor-default)}
 .${CLS}-g i.c::before{content:"";position:absolute;left:7px;top:0;height:50%;border-left:2px solid var(--borderColor-default)}
@@ -74,30 +79,47 @@ async function run() {
     const first = group[0]!.row;
     const parent = first.parentElement!;
 
-    // Group header inserted before the first row of this stack.
+    const wrap = document.createElement("div");
+    wrap.className = CLS + "-wrap";
     const hd = document.createElement("div");
     hd.className = CLS + "-hd";
-    hd.innerHTML = `<span>⧉ Stack tree</span><span>${label.slice(LABEL_PREFIX.length)}</span><span class="n">${res.tree.nodes.length} PRs · trunk ${res.tree.trunk}</span>`;
-    parent.insertBefore(hd, first);
+    hd.innerHTML = `${ICON}<span>Stack tree</span><span class="n">${label.slice(LABEL_PREFIX.length)}</span><span class="n r">${group.length} of ${res.tree.nodes.length} PRs</span>`;
+    const trunk = document.createElement("div");
+    trunk.className = CLS + "-trunk";
+    trunk.textContent = res.tree.trunk;
+    wrap.append(hd, trunk);
+    parent.insertBefore(wrap, first);
 
-    // Reorder rows in DFS order under the header; rows not on this page are skipped.
-    let cursor: Element = hd;
+    // Move rows into the wrapper in DFS order, with a guide column after the checkbox.
     for (const r of flatten(res.tree)) {
       const row = rowByPr.get(r.node.pr);
       if (!row) continue;
       row.classList.add(CLS + "-row");
-      row.querySelector("." + CLS + "-g")?.remove();
+      row.querySelector(":scope > ." + CLS + "-g")?.remove();
       const g = document.createElement("span");
       g.className = CLS + "-g";
       for (const cont of r.guides) g.append(cell(cont ? "v" : ""));
       g.append(cell(r.isLast ? "c" : "c v"));
-      row.prepend(g);
-      row.style.paddingLeft = `${16 * (r.depth + 1) + 8}px`;
-      cursor.after(row);
-      cursor = row;
+      // Walk up from the title link to the block that sits beside the checkbox,
+      // then insert the guide column just before it.
+      const link = row.querySelector<HTMLElement>(`a[href^="/${repo}/pull/${r.node.pr}"]`);
+      const checkbox = row.querySelector("input[type=checkbox]");
+      let block: HTMLElement | null = link;
+      while (block && block.parentElement && block.parentElement !== row && !(checkbox && block.contains(checkbox))) {
+        const p: HTMLElement = block.parentElement;
+        if (checkbox && p.contains(checkbox)) break;
+        block = p;
+      }
+      if (block && block !== row && !(checkbox && block.contains(checkbox))) {
+        block.before(g);
+        (block.parentElement as HTMLElement).classList.add(CLS + "-flex");
+      } else row.prepend(g);
+      wrap.append(row);
     }
   }
 }
+
+const ICON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm7 0a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM3 13.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM4.5 4a.75.75 0 0 1 .75.75v2.5c0 .69.56 1.25 1.25 1.25h3a2.75 2.75 0 0 0 2.75-2.75V4.75a.75.75 0 0 1 1.5 0v1a4.25 4.25 0 0 1-4.25 4.25h-3c-.45 0-.87-.11-1.25-.3v1.55a.75.75 0 0 1-1.5 0v-6.5A.75.75 0 0 1 4.5 4Z"/></svg>`;
 
 function cell(cls: string): HTMLElement {
   const i = document.createElement("i");

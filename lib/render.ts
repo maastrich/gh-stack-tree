@@ -105,8 +105,17 @@ export function renderPanel(tree: Tree, currentPr: number, repo: string, label: 
   return panel;
 }
 
-function renderCard(tree: Tree, currentPr: number, repo: string, label: string | undefined, onRebase: RebaseFn): HTMLElement {
-  const onPath = new Set(pathTo(tree, currentPr).map((n) => n.pr));
+export interface CardOpts {
+  /** Extra element(s) for the header's right side. */
+  headerExtra?: HTMLElement[];
+  /** Omit the rebase footer. */
+  noFooter?: boolean;
+}
+
+export function renderCard(tree: Tree, currentPr: number | null, repo: string, label: string | undefined, onRebase: RebaseFn | null, opts: CardOpts = {}): HTMLElement {
+  ensureStyle();
+  // With no current PR nothing is dimmed.
+  const onPath = currentPr === null ? new Set(tree.nodes.map((n) => n.pr)) : new Set(pathTo(tree, currentPr).map((n) => n.pr));
   const panel = document.createElement("div");
   panel.className = "gst-card";
 
@@ -127,6 +136,7 @@ function renderCard(tree: Tree, currentPr: number, repo: string, label: string |
   cnt.style.marginLeft = "auto";
   cnt.textContent = `${tree.nodes.length} PRs`;
   hd.append(cnt);
+  for (const e of opts.headerExtra ?? []) hd.append(e);
   panel.append(hd);
 
   const trunk = document.createElement("div");
@@ -174,6 +184,8 @@ function renderCard(tree: Tree, currentPr: number, repo: string, label: string |
     el.append(g, t, d, c, l);
     panel.append(el);
   }
+
+  if (opts.noFooter || !onRebase) return panel;
 
   const ft = document.createElement("div");
   ft.className = "ft";
