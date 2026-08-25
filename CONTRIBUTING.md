@@ -42,7 +42,7 @@ names.
 ## Commits
 
 Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`). Subject ≤ 72 chars.
-release-please derives the changelog and version from them.
+Add a changeset (`pnpm changeset`) to any user-facing change.
 
 ## Code of conduct
 

@@ -77,10 +77,12 @@ or copy it into `.claude/skills/`.
 
 ## Releases
 
-Continuous: [release-please](https://github.com/googleapis/release-please)
-turns Conventional Commits on `main` into a release PR; merging it tags a
-release, builds the `gh` extension binaries for every platform and attaches
-the browser-extension zips.
+Manual, tag-driven. Each change carries a [changeset](.changeset/README.md)
+(`pnpm changeset`). A maintainer runs the `/release` command
+([`.claude/commands/release.md`](.claude/commands/release.md)): bump, commit
+`release X.Y.Z` on `main`, push tag `vX.Y.Z`. The tag builds the `gh`
+extension binaries for every platform, zips the browser extension and
+publishes a GitHub Release.
 
 ## Contributing
 

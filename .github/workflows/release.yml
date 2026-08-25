@@ -1,63 +1,83 @@
-# Continuous delivery.
-#
-# 1. release-please watches main, keeps a "chore: release" PR up to date from
-#    Conventional Commits, and on merge creates the GitHub release + tag.
-# 2. On that release, the gh extension binaries are built and attached
-#    (gh extension install maastrich/gh-stack-tree), and the browser extension
-#    zips (chrome + firefox) are attached too.
+# Manual, tag-driven releases — see .claude/commands/release.md.
+# `pnpm changeset` per change; a maintainer runs `pnpm version`, commits
+# "release X.Y.Z" on main, then pushes tag vX.Y.Z.
 #
 # The skill needs no build: `npx skills add maastrich/gh-stack-tree` reads
 # skills/*/SKILL.md straight from the default branch.
 name: Release
+
 on:
   push:
-    branches: [main]
+    tags:
+      - "v*.*.*"
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
 permissions:
   contents: write
-  pull-requests: write
+
 jobs:
-  release-please:
+  browser-extension:
+    name: Browser extension
     runs-on: ubuntu-latest
-    outputs:
-      released: ${{ steps.rp.outputs.release_created }}
-      tag: ${{ steps.rp.outputs.tag_name }}
+    defaults: { run: { working-directory: extension } }
     steps:
-      - uses: googleapis/release-please-action@v4
-        id: rp
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm compile
+      - run: pnpm test
+      - run: pnpm zip && pnpm zip:firefox
+      - uses: actions/upload-artifact@v4
+        with: { name: browser-extension, path: extension/.output/*.zip }
+      # Store publishing (Chrome Web Store / AMO) plugs in here with `wxt submit`
+      # once the store credentials exist as repository secrets.
+
+  release:
+    name: GitHub Release
+    needs: browser-extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/download-artifact@v4
+        with: { name: browser-extension, path: dist }
+      - uses: softprops/action-gh-release@v2
         with:
-          release-type: simple
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          generate_release_notes: true
+          files: dist/*.zip
+          body: |
+            ## Installation
+
+            **gh extension**
+            ```bash
+            gh extension install maastrich/gh-stack-tree   # or: gh extension upgrade stack-tree
+            ```
+
+            **Browser extension** — download the chrome or firefox zip below,
+            unzip, load unpacked (`chrome://extensions` → Developer mode;
+            Firefox `about:debugging`), then set a GitHub token in the options.
+
+            **Agent skill**
+            ```bash
+            npx skills add maastrich/gh-stack-tree
+            ```
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/extension/CHANGELOG.md) for details.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   gh-extension:
-    needs: release-please
-    if: needs.release-please.outputs.released == 'true'
+    name: gh extension binaries
+    needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with: { go-version-file: cli/go.mod }
       - uses: cli/gh-extension-precompile@v2
         with:
           go_version_file: cli/go.mod
           build_script_override: scripts/build-gh-extension.sh
-          release_tag: ${{ needs.release-please.outputs.tag }}
-
-  browser-extension:
-    needs: release-please
-    if: needs.release-please.outputs.released == 'true'
-    runs-on: ubuntu-latest
-    defaults: { run: { working-directory: extension } }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 10 }
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm, cache-dependency-path: extension/pnpm-lock.yaml }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm zip && pnpm zip:firefox
-      - name: Attach zips to the release
-        env: { GH_TOKEN: "${{ github.token }}" }
-        run: gh release upload "${{ needs.release-please.outputs.tag }}" .output/*.zip --clobber
-      # Store publishing (Chrome Web Store / AMO) plugs in here with `wxt submit`
-      # once the store credentials exist as repository secrets.

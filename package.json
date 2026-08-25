@@ -1,0 +1,13 @@
+{
+  "name": "gh-stack-tree-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.8.1",
+  "scripts": {
+    "changeset": "changeset",
+    "version": "changeset version && pnpm install --lockfile-only"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.5"
+  }
+}
