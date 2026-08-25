@@ -40,7 +40,7 @@ of the release.
 1. **Bump version and consume changesets**
 
    ```bash
-   pnpm version
+   pnpm run version
    ```
 
    Runs `changeset version`: updates `extension/package.json`, regenerates
