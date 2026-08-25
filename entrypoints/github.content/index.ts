@@ -59,12 +59,9 @@ async function rebase(tree: Tree, ids: Record<number, string>, root: number | nu
   return null;
 }
 
-/** GitHub's "This pull request can be stacked… Preview stack" suggestion banner. */
+/** GitHub's "This pull request can be stacked… / Preview stack" suggestion banner. */
 function hideNativeStackBanner() {
-  const btn = [...document.querySelectorAll<HTMLElement>("a, button")].find(
-    (b) => /^\s*Preview stack\s*$/.test(b.textContent ?? ""),
-  );
-  const banner = btn?.closest<HTMLElement>("[class*='Banner'], [role='alert'], .flash, [data-testid*='banner']")
-    ?? btn?.parentElement?.parentElement ?? null;
+  const link = document.querySelector<HTMLElement>("a[href*='gh.io/stacks-overview']");
+  const banner = link?.closest<HTMLElement>("section[data-component='Banner'], [aria-label='Can Stack Banner'], .flash");
   if (banner) banner.style.display = "none";
 }
