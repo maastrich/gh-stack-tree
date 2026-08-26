@@ -41,13 +41,16 @@ func runLabel(args []string) error {
 	if err != nil {
 		return err
 	}
-	if existing := pr.StackLabel(); existing != "" {
-		return fmt.Errorf("#%d already belongs to %s (run unlabel first)", pr.Number, existing)
-	}
-
 	name := ""
 	if len(pos) > 0 {
 		name = pos[0]
+	}
+	if existing := pr.StackLabel(); existing != "" {
+		if name != "" && gh.LabelPrefix+strings.TrimPrefix(name, gh.LabelPrefix) == existing {
+			fmt.Printf("#%d already in %s\n", pr.Number, existing)
+			return nil
+		}
+		return fmt.Errorf("#%d already belongs to %s (run unlabel first)", pr.Number, existing)
 	}
 	if name == "" {
 		// Inherit the parent's stack when the base branch has one.
