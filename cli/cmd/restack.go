@@ -37,9 +37,11 @@ func runRestack(args []string) error {
 	yes := fs.Bool("yes", false, "push without asking")
 	fs.BoolVar(yes, "y", false, "alias for --yes")
 	allowDiverged := fs.Bool("allow-diverged", false, "rebase branches whose local copy has commits origin lacks")
-	if err := fs.Parse(args); err != nil {
+	pos, err := parseAnywhere(fs, args)
+	if err != nil {
 		return err
 	}
+	_ = pos
 
 	if !git.IsClean() {
 		return errors.New("working tree is dirty, commit or stash first")
@@ -148,17 +150,28 @@ func runRestack(args []string) error {
 		}
 	}
 
+	// local ref for a head: the branch when present, origin/<head> otherwise
+	// (dry run before the branch was pulled)
+	local := func(head string) string {
+		if git.Verify(head) {
+			return head
+		}
+		return "origin/" + head
+	}
+
 	// 3. snapshot fork points before anything moves
 	fork := map[*tree.Node]string{}
 	for _, n := range t.Nodes {
-		if _, ok := skip[n]; ok || !git.Verify(n.PR.Head) {
+		if _, ok := skip[n]; ok || !git.Verify(local(n.PR.Head)) {
 			continue
 		}
 		ref := newBase[n]
-		if n.Parent == nil && git.Verify(n.PR.Base) {
-			ref = n.PR.Base // merged parent still local: exact fork point
+		if n.Parent != nil {
+			ref = local(n.Parent.PR.Head)
+		} else if n.PR.Base != t.Trunk && git.Verify(local(n.PR.Base)) {
+			ref = local(n.PR.Base) // merged parent still around: exact fork point
 		}
-		f, err := git.MergeBase(n.PR.Head, ref)
+		f, err := git.MergeBase(local(n.PR.Head), ref)
 		if err != nil {
 			return err
 		}
@@ -178,12 +191,12 @@ func runRestack(args []string) error {
 		}
 		f, ok := fork[n]
 		if !ok {
-			continue // dry run, branch not pulled
+			continue
 		}
 		h, nb := n.PR.Head, newBase[n]
 		shown := strings.TrimPrefix(nb, "origin/")
 		parentPlanned := *dry && n.Parent != nil && planned[n.Parent]
-		if !parentPlanned && git.IsAncestor(nb, h) {
+		if !parentPlanned && git.IsAncestor(local(nb), local(h)) {
 			fmt.Printf("  = %s (already on top of %s)\n", h, shown)
 			continue
 		}

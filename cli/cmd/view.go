@@ -12,9 +12,11 @@ import (
 func runView(args []string) error {
 	fs := flag.NewFlagSet("view", flag.ContinueOnError)
 	stack := fs.String("stack", "", "stack name")
-	if err := fs.Parse(args); err != nil {
+	pos, err := parseAnywhere(fs, args)
+	if err != nil {
 		return err
 	}
+	_ = pos
 	label, err := resolveStack(*stack)
 	if err != nil {
 		return err

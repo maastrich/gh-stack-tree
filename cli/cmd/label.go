@@ -32,9 +32,11 @@ func targetPR(number int) (*gh.PR, error) {
 func runLabel(args []string) error {
 	fs := flag.NewFlagSet("label", flag.ContinueOnError)
 	number := fs.Int("pr", 0, "pull request number (default: current branch)")
-	if err := fs.Parse(args); err != nil {
+	pos, err := parseAnywhere(fs, args)
+	if err != nil {
 		return err
 	}
+	_ = pos
 	pr, err := targetPR(*number)
 	if err != nil {
 		return err
@@ -43,7 +45,10 @@ func runLabel(args []string) error {
 		return fmt.Errorf("#%d already belongs to %s (run unlabel first)", pr.Number, existing)
 	}
 
-	name := fs.Arg(0)
+	name := ""
+	if len(pos) > 0 {
+		name = pos[0]
+	}
 	if name == "" {
 		// Inherit the parent's stack when the base branch has one.
 		parent, err := gh.ForBranch(pr.Base)
@@ -70,9 +75,11 @@ func runLabel(args []string) error {
 func runUnlabel(args []string) error {
 	fs := flag.NewFlagSet("unlabel", flag.ContinueOnError)
 	number := fs.Int("pr", 0, "pull request number (default: current branch)")
-	if err := fs.Parse(args); err != nil {
+	pos, err := parseAnywhere(fs, args)
+	if err != nil {
 		return err
 	}
+	_ = pos
 	pr, err := targetPR(*number)
 	if err != nil {
 		return err

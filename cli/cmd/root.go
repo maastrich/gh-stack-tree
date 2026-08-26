@@ -4,6 +4,7 @@ package cmd
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -121,4 +122,31 @@ func runStacks() error {
 		fmt.Println(strings.TrimPrefix(l, gh.LabelPrefix))
 	}
 	return nil
+}
+
+// parseAnywhere lets flags appear before or after positional arguments
+// (`label lcm-agent --pr 12` and `label --pr 12 lcm-agent` both work).
+func parseAnywhere(fs *flag.FlagSet, args []string) ([]string, error) {
+	var flags, pos []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if strings.HasPrefix(a, "-") {
+			flags = append(flags, a)
+			name := strings.TrimLeft(a, "-")
+			if f := fs.Lookup(strings.SplitN(name, "=", 2)[0]); f != nil && !strings.Contains(a, "=") {
+				if b, ok := f.Value.(interface{ IsBoolFlag() bool }); !ok || !b.IsBoolFlag() {
+					if i+1 < len(args) {
+						i++
+						flags = append(flags, args[i])
+					}
+				}
+			}
+			continue
+		}
+		pos = append(pos, a)
+	}
+	if err := fs.Parse(flags); err != nil {
+		return nil, err
+	}
+	return pos, nil
 }
