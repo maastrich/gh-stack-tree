@@ -15,9 +15,10 @@ type Node struct {
 }
 
 type Tree struct {
-	Trunk string
-	Nodes []*Node // every node, sorted by PR number
-	Roots []*Node
+	Trunk  string
+	Nodes  []*Node // every open node, sorted by PR number
+	Roots  []*Node
+	Merged []gh.PR // merged into trunk, oldest first
 }
 
 // Build links PRs by base <- head. Only open PRs become nodes; merged ones are
@@ -26,6 +27,9 @@ func Build(trunk string, prs []gh.PR) *Tree {
 	t := &Tree{Trunk: trunk}
 	byHead := map[string]*Node{}
 	for _, p := range prs {
+		if p.State == "MERGED" && p.Base == trunk {
+			t.Merged = append(t.Merged, p)
+		}
 		if p.State != "OPEN" {
 			continue
 		}
@@ -34,6 +38,7 @@ func Build(trunk string, prs []gh.PR) *Tree {
 		byHead[p.Head] = n
 	}
 	sort.Slice(t.Nodes, func(i, j int) bool { return t.Nodes[i].PR.Number < t.Nodes[j].PR.Number })
+	sort.Slice(t.Merged, func(i, j int) bool { return t.Merged[i].Number < t.Merged[j].Number })
 	for _, n := range t.Nodes {
 		if p, ok := byHead[n.PR.Base]; ok {
 			n.Parent = p
@@ -87,8 +92,13 @@ func Subtree(n *Node) []*Node {
 }
 
 // Render draws the tree with box characters. mark is highlighted with ◀.
+// PRs already merged into trunk are listed above it.
 func (t *Tree) Render(mark string) string {
-	s := "(" + t.Trunk + ")\n"
+	s := ""
+	for _, m := range t.Merged {
+		s += fmt.Sprintf("┆  #%d %s (merged)\n", m.Number, m.Head)
+	}
+	s += "(" + t.Trunk + ")\n"
 	var walk func(n *Node, prefix string, last bool)
 	walk = func(n *Node, prefix string, last bool) {
 		conn := "├─ "

@@ -26,7 +26,7 @@ func TestOrderAndRender(t *testing.T) {
 	if got != "abcd" {
 		t.Fatalf("order = %q", got)
 	}
-	want := "(main)\n└─ #1 a\n   ├─ #2 b\n   └─ #3 c ◀\n      └─ #4 d\n"
+	want := "┆  #9 old (merged)\n(main)\n└─ #1 a\n   ├─ #2 b\n   └─ #3 c ◀\n      └─ #4 d\n"
 	if r := tr.Render("c"); r != want {
 		t.Fatalf("render:\n%s\nwant:\n%s", r, want)
 	}

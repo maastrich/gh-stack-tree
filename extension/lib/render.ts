@@ -1,5 +1,5 @@
 import type { Tree, TreeNode } from "./types";
-import { flatten, pathTo, subtree } from "./tree";
+import { flatten, pathTo, subtree, type Row } from "./tree";
 
 function cell(cls: string): HTMLElement {
   const i = document.createElement("i");
@@ -27,6 +27,8 @@ const css = `
 .gst-card .g i.c::before{content:"";position:absolute;left:7px;top:0;height:50%;border-left:2px solid var(--borderColor-default)}
 .gst-card .g i.c::after{content:"";position:absolute;left:7px;top:50%;width:9px;border-top:2px solid var(--borderColor-default)}
 .gst-card .g i.c.v::before{height:100%}
+.gst-card .g i.m::before{content:"";position:absolute;left:7px;top:0;bottom:0;border-left:2px dashed var(--borderColor-default)}
+.gst-card .row.merged{opacity:.75}
 .gst-card .t{min-width:0;display:flex;flex-direction:column;gap:1px}
 .gst-card .t a{font-weight:600;color:var(--fgColor-default);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gst-card .t a:hover{color:var(--fgColor-accent)}
@@ -148,21 +150,30 @@ export function renderCard(tree: Tree, currentPr: number | null, repo: string, l
   for (const e of opts.headerExtra ?? []) hd.append(e);
   panel.append(hd);
 
+  // PRs already merged into trunk sit above it: they are part of trunk now.
+  const mergedIntoTrunk = tree.nodes.filter((n) => n.merged && n.parent === null);
+  const live = { trunk: tree.trunk, nodes: tree.nodes.filter((n) => !mergedIntoTrunk.includes(n)) };
+  for (const node of mergedIntoTrunk) panel.append(renderRow(node, { guides: [], isLast: true, depth: 0, node }, "merged"));
+
   const trunk = document.createElement("div");
   trunk.className = "trunk";
   trunk.textContent = tree.trunk;
   panel.append(trunk);
 
-  for (const row of flatten(tree)) {
-    const { node } = row;
+  for (const row of flatten(live)) panel.append(renderRow(row.node, row, ""));
+  function renderRow(node: TreeNode, row: Row, extra: string): HTMLElement {
     const isCur = node.pr === currentPr;
     const el = document.createElement("div");
     el.className = "row" + (isCur ? " cur" : "") + (onPath.has(node.pr) ? "" : " off");
+    if (extra === "merged") el.classList.remove("off");
 
     const g = document.createElement("span");
     g.className = "g";
-    for (const cont of row.guides) g.append(cell(cont ? "v" : ""));
-    g.append(cell(row.isLast ? "c" : "c v"));
+    if (extra === "merged") g.append(cell("m"));
+    else {
+      for (const cont of row.guides) g.append(cell(cont ? "v" : ""));
+      g.append(cell(row.isLast ? "c" : "c v"));
+    }
 
     const t = document.createElement("div");
     t.className = "t";
@@ -191,7 +202,8 @@ export function renderCard(tree: Tree, currentPr: number | null, repo: string, l
     l.style.color = "var(--fgColor-onEmphasis)";
 
     el.append(g, t, d, c, l);
-    panel.append(el);
+    if (extra) el.classList.add(extra);
+    return el;
   }
 
   if (opts.noFooter || !onRebase) return panel;
